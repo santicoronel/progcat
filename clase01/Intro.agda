@@ -61,7 +61,8 @@ suc m + n = suc (m + n)
 ----------------------------------------------
 {- Ejercicio : Definir la multiplicación -}
 _*_ :  ℕ → ℕ → ℕ
-m * n = {!  !}
+zero * n = zero
+suc m * n = n + (m * n)
 ----------------------------------------------
 
 infixl 6 _+_
@@ -112,14 +113,16 @@ rev (x ∷ xs) = snoc (rev xs) x
 --------------------------------------------------
 {- Ej : longitud de una lista -}
 length : {A : Set} → List A → ℕ
-length xs = {!!}
+length [] = 0
+length (x ∷ xs) = 1 + length xs
 --------------------------------------------------
 
 
 --------------------------------------------------
 {- Ej : concatenar dos listas -}
 _++_ : {A : Set} → List A → List A → List A
-xs ++ ys = {!!}
+[] ++ ys = ys
+x ∷ xs ++ ys = x ∷ (xs ++ ys)
 --------------------------------------------------
 
 infixr 4 _++_
@@ -253,11 +256,14 @@ nat (suc n) = suc (nat n)
         de manera tal que nat x = nat (emb x)
 -}
 emb : {n : ℕ} → Fin n → Fin (suc n)
-emb = {!!}
+emb zero = zero
+emb {suc n} (suc m) = suc {suc n} (emb m)
 
 {- Ej: inv me lleva de {0,1,...,n-1} a {n-1,..,1,0} -}
 inv : {n : ℕ} → Fin n → Fin n
-inv i = {!!}
+inv {suc zero} zero = zero
+inv {suc n} zero = max
+inv {suc n} (suc m) = emb (inv m)
 -----------------------------------------------------------
 
 
@@ -293,7 +299,7 @@ Matrix m n = Vec (Vector n) m
 -------------------------------------------------------
 {- Ej: multiplicación por un escalar -}
 _*v_ : {n : ℕ} → ℕ → Vector n → Vector n
-k *v ms = mapVec {!!} ms
+k *v ms = mapVec (λ x → k * x) ms
 
 v1 : Vector 3
 v1 = 1 ∷ 2 ∷ 3 ∷ []
@@ -303,7 +309,7 @@ test1 = 2 *v v1
 
 {- Ej: suma de vectores -}
 _+v_ : {n : ℕ} → Vector n → Vector n → Vector n
-ms +v ns = {!!}
+ms +v ns = appV (mapVec (_+_) ms) ns
 
 v2 : Vector 3
 v2 = 2 ∷ 3 ∷ 0 ∷ []
@@ -312,8 +318,9 @@ test2 : Vector 3
 test2 = v1 +v v2
 
 {- Ej: multiplicación de un vector y una matriz -}
-_*vm_ : {m n : ℕ} → Vector m → Matrix m n → Vector n
-ms *vm nss = {!!}
+_*vm_ : {m n : ℕ} → Vector (suc m) → Matrix (suc m) n → Vector n
+(m ∷ []) *vm (ns ∷ []) = m *v ns
+(m ∷ m1 ∷ ms) *vm (ns ∷ nss) = (m *v ns) +v ((m1 ∷ ms) *vm nss)
 
 id3 : Matrix 3 3
 id3 = (1 ∷ 0 ∷ 0 ∷ []) 
@@ -325,8 +332,8 @@ test3 : Vector 3
 test3 = v1 *vm id3
 
 {- Ej: multiplicación de matrices -}
-_*mm_ : {l m n : ℕ} → Matrix l m → Matrix m n → Matrix l n
-mss *mm nss = {!!}
+_*mm_ : {l m n : ℕ} → Matrix (suc l) (suc m) → Matrix (suc m) n → Matrix (suc l) n
+mss *mm nss = mapVec (λ ms → ms *vm nss) mss
 
 inv3 : Matrix 3 3
 inv3 = (0 ∷ 0 ∷ 1 ∷ []) 
@@ -338,8 +345,10 @@ test4 : Matrix 3 3
 test4 = inv3 *mm inv3
 
 {- Ej: transposición de matrices -}
-transpose : {n m : ℕ} → Matrix m n → Matrix n m
-transpose m = {!!}
+transpose : {n m : ℕ} → Matrix (suc m) n → Matrix n (suc m)
+transpose ([] ∷ []) = []
+transpose ((x ∷ m) ∷ []) = (x ∷ []) ∷ transpose (m ∷ [])
+transpose {n} {suc m} (v ∷ ms) = appV (mapVec _∷_ v) (transpose ms)
 
 ej5 : Matrix 3 3
 ej5 = ( 0 ∷ 1 ∷ 2 ∷ [])
@@ -355,5 +364,5 @@ test5 = transpose ej5
 Bajar el archivo del repositorio y hacer los ejercicios.
  git clone https://github.com/mjaskelioff/progcat.git
 
--}
-  
+-} 
+   
