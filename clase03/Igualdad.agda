@@ -99,11 +99,13 @@ subst P {a} {.a} refl x = x
 {- Probar sym y trans usando subst -}
 
 sym' : {A : Set} → {a b : A} → a ≡ b → b ≡ a
-sym' {a = a} p = subst {!!} {!!} {!!}
+sym' {a = a} p = subst (λ x → x ≡ a) p refl
 
 trans' : {A : Set}{a b c : A} → a ≡ b → b ≡ c → a ≡ c
-trans' {a = a} ab bc = subst {!!} {!!} {!!}
+trans' {a = a} ab bc = subst (λ x → a ≡ x) bc ab
 
+leibniz : {A : Set}{a b : A} → ((P : A → Set) → P a → P b) → a ≡ b
+leibniz {a = a} obs = obs (λ x → a ≡ x) refl
 --------------------------------------------------
 
 {- unicidad de pruebas de identidad (UIP) -}
@@ -129,6 +131,9 @@ open import Data.Nat hiding (_⊔_)
 
 
 {- Miremos la interacción entre + y suc -}
+
+suc+ : (m n : ℕ) → suc m + n ≡ suc (m + n)
+suc+ m n = refl
 
 +suc : (m n : ℕ) → m + suc n ≡ suc (m + n)
 +suc zero n = refl
@@ -173,13 +178,63 @@ suma-equiv' x (suc y) =
 intentar que la prueba sea legible usando ≡-Reasoning
 -}
 +-comm : (m n : ℕ) → m + n ≡ n + m
-+-comm m n = {!!}
++-comm zero n = 
+  begin 
+  zero + n 
+  ≡⟨ 0+ n ⟩ 
+  n 
+  ≡⟨ sym (+0 n) ⟩ 
+  (n + zero) 
+  ∎
+
++-comm (suc m) n = 
+  begin
+  suc m + n
+  ≡⟨ suc+ m n ⟩ 
+  suc (m + n) 
+  ≡⟨ cong suc (+-comm m n) ⟩
+  suc (n + m)
+  ≡⟨ sym (+suc n m)⟩
+  n + suc m 
+  ∎
 
 +-assoc : (m n l : ℕ) → m + (n + l) ≡ (m + n) + l
-+-assoc m n l = {!!}
++-assoc zero n l = 
+  begin
+  zero + (n + l)
+  ≡⟨ 0+ (n + l) ⟩
+  n + l
+  ≡⟨ cong (λ x → x + l) (0+ n) ⟩
+  (zero + n) + l
+  ∎
++-assoc (suc m) n l = 
+  begin
+  suc m + (n + l)
+  ≡⟨ suc+ m (n + l) ⟩
+  suc (m + (n + l))
+  ≡⟨ cong suc (+-assoc m n l) ⟩
+  suc ((m + n) + l) 
+  ≡⟨ sym (suc+ (m + n) l) ⟩
+  (suc (m + n)) + l
+  ≡⟨ cong (λ x → x + l) (suc+ m n) ⟩
+  (suc m + n) + l
+  ∎
+
+0* : ∀ m → 0 ≡ 0 * m
+0* m = refl
 
 *0 : ∀ m → 0 ≡ m * 0
-*0 m = {!   !}
+*0 0 = refl
+*0 (suc m) = 
+  begin
+  0
+  ≡⟨ 0+ 0 ⟩
+  0 + 0
+  ≡⟨ cong (λ x → 0 + x) (*0 m) ⟩
+  0 + m * 0
+  ≡⟨ refl ⟩
+  suc m * 0
+  ∎
 
 *suc : (m n : ℕ) → m + m * n ≡ m * suc n
 *suc m n = {!   !} 
@@ -218,7 +273,7 @@ _≡?_ : (m n : ℕ) → Dec (m ≡ n)
 zero ≡? zero = yes refl
 zero ≡? suc n = no (lem n)
 suc m ≡? zero = no (λ ())
-suc m ≡? suc n with m ≡? n 
+suc m ≡? suc n with m ≡? n
 ... | yes p = yes (cong suc p)
 ... | no nop = no (λ x → nop (cong pred x))
 
@@ -355,17 +410,29 @@ ExtensionalityImplicit =
   (∀ {x} → f {x} ≅ g {x}) → (λ {x} → f {x}) ≅ (λ {x} → g {x})
 
 {-
-Ejercicio. Probar que no hace falta *postular* ExtensionalityImplicit ya que Extensionalidad la implica.
+Ejercicio. Probar que no hace falta *postular* ExtensionalityImp{x : A} → B licit ya que Extensionalidad la implica.
 Puede ser últil el siguiente operador posfijo
 -}
 _$- : {A : Set} {B : A → Set} → ((x : A) → B x) → ({x : A} → B x)
 f $- = f _
 
+cong≅ : {A : Set} {B : A → Set} → (f : (x : A) → B x) → {x y : A} → (x ≅ y) → f x ≅ f y
+cong≅ f refl = refl
+
+foo : {A : Set}{B : A → Set}(C : ({x : A} → B x) → Set) → 
+      ((f : ({x : A} → B x)) → C f) → ((f : ((x : A) → B x)) → C (f $-))
+foo C F = λ f → F (f $-)
+
+bar : {A : Set}{B : A → Set}(C : ((x : A) → B x) → Set) → 
+      ((f : ((x : A) → B x)) → C f) → ((f : ({x : A} → B x)) → C (λ x → f {x}))
+bar C F = λ f → F (λ x → f)
+
 implicit-extensionality : Extensionality → ExtensionalityImplicit
-implicit-extensionality ext f≅g = {!   !}
+implicit-extensionality ext {A = A} {B = B} {f = f} {g = g} f≅g 
+ = cong≅ (_$-) (ext (λ x → refl) (λ x → f≅g {x})) 
 
 iext : ExtensionalityImplicit
-iext = {!   !}
+iext = implicit-extensionality ext
 
 
 --------------------------------------------------
@@ -381,23 +448,52 @@ open import Data.Sum
   div₂ : división por 2
 -}
 mod₂ : ℕ → ℕ 
-mod₂ n = {!   !}
+mod₂ 0 = 0
+mod₂ 1 = 1
+mod₂ (2+ n) = mod₂ n
 
 div₂ : ℕ → ℕ
-div₂ n = {!   !}
+div₂ 0 = 0
+div₂ 1 = 0
+div₂ (2+ n) = suc (div₂ n)
 
 {- Probar las sigfuientes propiedades: -}
 
 mod₂Lem : (n : ℕ) → (mod₂ n ≡ 0) ⊎ (mod₂ n ≡ 1)
-mod₂Lem n = {!   !}
+mod₂Lem 0 = inj₁ refl
+mod₂Lem 1 = inj₂ refl
+mod₂Lem (2+ n) = mod₂Lem n
 
 div₂Lem : ∀ {n} → 2 * (div₂ n) + mod₂ n ≡ n
-div₂Lem {n} = {!   !}
+div₂Lem {0} = refl
+div₂Lem {1} = refl
+div₂Lem {2+ n} = begin
+  2 * (div₂ (2+ n)) + mod₂ (2+ n)
+  ≡⟨ refl ⟩   
+  2 * (suc (div₂ n)) + mod₂ n  
+  ≡⟨ refl ⟩
+  ((suc (div₂ n)) + (suc (div₂ n) + 0)) +  mod₂ n
+  ≡⟨ refl ⟩
+  suc (div₂ n + (suc (div₂ n) + 0)) + mod₂ n 
+  ≡⟨ cong (λ x → suc (div₂ n + x) + mod₂ n) (+0 (suc (div₂ n))) ⟩
+  suc (div₂ n + suc (div₂ n)) + mod₂ n
+  ≡⟨ cong (λ x → suc x + mod₂ n) (+suc (div₂ n) (div₂ n)) ⟩
+  ((2+ (div₂ n + div₂ n)) + mod₂ n) 
+  ≡⟨ refl ⟩
+  2+ ((div₂ n + div₂ n) + mod₂ n) 
+  ≡⟨ cong (λ x → 2+ ((div₂ n + x) + mod₂ n)) (sym (+0 (div₂ n))) ⟩
+  2+ ((div₂ n + (div₂ n + 0)) + mod₂ n)
+  ≡⟨ refl ⟩
+  2+ (2 * (div₂ n) + mod₂ n)
+  ≡⟨ cong 2+ div₂Lem ⟩ 
+  2+ n
+  ∎
 
 {- Mostrar que la igualdad modulo 2 es decidible -}
 
 _≡₂_ : ℕ → ℕ → Set
 m ≡₂ n = mod₂ m ≡ mod₂ n
 
-_≡₂?_ : (m n : ℕ) → Dec (m ≡₂ n)
-m ≡₂? n = {!   !}
+
+_≡₂?_ : (m n : ℕ) → Dec (m ≡₂ n) 
+m ≡₂? n = mod₂ m ≡? mod₂ n
