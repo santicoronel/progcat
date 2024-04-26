@@ -229,9 +229,20 @@ morfismos son los elementos de un monoide M -}
 module CatMon where
 
  open import Records-completo hiding (Iso ; ⊤)
+ open Monoid
+
+ record ⊤₁ : Set₁ where
+   constructor ⋆
 
  CatMon : Monoid → Cat
- CatMon M = {!!} 
+ CatMon M = record { 
+               Obj = ⊤₁
+            ;  Hom = λ { ⋆ ⋆ → Carrier M}
+            ;  iden = ε M
+            ;  _∙_ = _∙_ M
+            ;  idl = lid M
+            ;  idr = rid M
+            ;  ass = assoc M }
 
 
 --------------------------------------------------
@@ -246,8 +257,38 @@ module MonCat where
  open Is-Monoid-Homo
 
 
+ ir-mon : {M N : Monoid} (f : Monoid.Carrier M → Monoid.Carrier N ) 
+                         → {p : Is-Monoid-Homo M N f} → {q : Is-Monoid-Homo M N f}
+                         → p ≡ q
+ ir-mon f {p} {q} = proof
+                  p
+                  ≡⟨⟩
+                  is-monoid-homo (preserves-unit p) (preserves-mult p)
+                  ≡⟨ cong (λ r → is-monoid-homo r (preserves-mult p))
+                          (ir (preserves-unit p) (preserves-unit q)) ⟩
+                  is-monoid-homo (preserves-unit q) (preserves-mult p)
+                  ≡⟨ cong (λ r → is-monoid-homo (preserves-unit q) (λ {x}{y} → r {x} {y}))
+                          (i2ir (preserves-mult p) (preserves-mult q)) ⟩
+                  is-monoid-homo (preserves-unit q) (preserves-mult q) 
+                  ≡⟨⟩
+                  q
+                  ∎ 
+
  MonCat : Cat
- MonCat = {!!}
+ MonCat = record {
+           Obj = Monoid
+         ; Hom = λ M N → ∃ (Is-Monoid-Homo M N)
+         ; iden = id , (is-monoid-homo refl refl)
+         ; _∙_ = λ { (f , hf) (g , hg) →
+                  f ∘ g , 
+                  is-monoid-homo 
+                     (trans (cong f (preserves-unit hg)) (preserves-unit hf)) 
+                     (λ {x}{y} 
+                        → (trans (cong f (preserves-mult hg {x} {y})) (preserves-mult hf {g x} {g y})))
+                  }
+         ; idl = λ { {f = f , _} → cong (_,_ f) (ir-mon f) }
+         ; idr = refl
+         ; ass = λ { {f = f , _} {g = g , _} {h = h , _} →  cong (_,_ (f ∘ g ∘ h)) (ir-mon  (f ∘ g ∘ h)) }}
  
 --------------------------------------------------
 {- Ejercicio: Dada un categoría C, definir la siguiente categoría:
@@ -257,13 +298,71 @@ module MonCat where
                     f' ∙ g₁ ≡ g₂ ∙ f
 -}
 
-module ArrowCat (C : Cat) where
+module CommSquare (∁ : Cat) where
+ 
+ open Cat ∁
+ 
+ CommSquare : {A B C D : Obj} → Hom A B → Hom C D → Set
+ CommSquare f₁ f₂ = ∃₂ λ g₁ g₂ → f₂ ∙ g₁ ≡ g₂ ∙ f₁
 
- open Cat C 
+ □-lem : {A B C D E F : Obj}
+         {f₁ : Hom A B}{f₂ : Hom C D}{f₃ : Hom E F}
+         {g₁ : Hom A C}{g₂ : Hom C E}
+         {h₁ : Hom B D}{h₂ : Hom D F}
+       → f₂ ∙ g₁ ≡ h₁ ∙ f₁ → f₃ ∙ g₂ ≡ h₂ ∙ f₂
+       → f₃ ∙ (g₂ ∙ g₁) ≡ (h₂ ∙ h₁) ∙ f₁
+ □-lem {f₁ = f₁} {f₂ = f₂} {f₃ = f₃} {g₁ = g₁} {g₂ = g₂} {h₁ = h₁} {h₂ = h₂} p₁ p₂ =
+      proof
+         f₃ ∙ (g₂ ∙ g₁)
+      ≡⟨ sym ass ⟩
+         (f₃ ∙ g₂) ∙ g₁
+      ≡⟨ cong (λ k → k ∙ g₁) p₂ ⟩
+         (h₂ ∙ f₂) ∙ g₁
+      ≡⟨ ass ⟩
+         h₂ ∙ (f₂ ∙ g₁)
+      ≡⟨ cong (_∙_ h₂) p₁ ⟩
+         h₂ ∙ (h₁ ∙ f₁)
+      ≡⟨ sym ass ⟩
+         (h₂ ∙ h₁) ∙ f₁
+      ∎
 
+ _□_ : {A B C D E F : Obj}{f₁ : Hom A B}{f₂ : Hom C D}{f₃ : Hom E F}
+     → CommSquare f₂ f₃ → CommSquare f₁ f₂ → CommSquare f₁ f₃
+ _□_ {f₁ = f₁} {f₂ = f₂} {f₃ = f₃} (g₂ , h₂ , p₂) (g₁ , h₁ , p₁)
+     = g₂ ∙ g₁ , h₂ ∙ h₁ , □-lem p₁ p₂   
+
+ snd₂ : {A : Set}{B : A → Set}{C : (x : A) → B x → Set} → (x : ∃₂ C) → B (fst x)
+ snd₂ (x , y , z) = y
+
+ cs-ir : {A B C D : Obj}{f₁ : Hom A B}{f₂ : Hom C D} 
+          → (x y : CommSquare f₁ f₂) 
+          → fst x ≡ fst y → snd₂ x ≡ snd₂ y
+          → x ≡ y
+ cs-ir (g₁ , g₂ , p) (.g₁ , .g₂ , q) refl refl rewrite ir p q = refl
+
+module ArrowCat (∁ : Cat) where
+
+ open Cat ∁
+ open CommSquare ∁
+ 
+ ArrObj : Set₁
+ ArrObj = ∃₂ Hom
+
+ ArrHom : ArrObj → ArrObj → Set
+ ArrHom (A , B , f₁) (C , D , f₂) = CommSquare f₁ f₂
+ 
+ ArrId : {X : ArrObj} → ArrHom X X 
+ ArrId = iden , iden , trans idr (sym idl)  
 
  ArrowCat : Cat
- ArrowCat = {!!}
+ ArrowCat = record {
+              Obj = ArrObj
+            ; Hom = ArrHom
+            ; iden = ArrId
+            ; _∙_ = _□_
+            ; idl = λ { {f = f} → cs-ir (ArrId □ f) f idl idl }
+            ; idr = λ { {f = f } → cs-ir (f □ ArrId) f idr idr}
+            ; ass = λ { {f = f} {g = g} {h = h} → cs-ir ((f □ g) □ h) (f □ (g □ h)) ass ass } }
  
 --------------------------------------------------
 {- Generalizamos la noción de isomorfismo de la clase pasada a cualquier categoría -}
@@ -286,13 +385,32 @@ record Iso {C : Cat}(A B : Obj C)(fun : Hom C A B) : Set where
 Ayuda : puede ser útil usar cong-app
 -}
 
+open import Records-completo using ( Biyectiva )
+
+iso→biyec : {A B : Set}{f : A → B} → Iso {Sets} A B f → Biyectiva f
+iso→biyec {f = f} (iso inv law1 law2) y = inv y , cong-app law1 y , 
+                                          λ x fx≡y 
+                                             →  proof
+                                                   inv y
+                                                ≡⟨ cong inv (sym fx≡y) ⟩ 
+                                                   inv (f x)
+                                                ≡⟨ cong-app law2 x ⟩
+                                                   x
+                                                ∎
+
+biyec→iso : {A B : Set}{f : A → B} → Biyectiva f → Iso {Sets} A B f
+biyec→iso {f = f} b = iso  (λ y → fst (b y)) 
+                           (ext (fst ∘ snd ∘ b)) 
+                           (ext λ x → snd (snd (b (f x))) x refl)
 
 --------------------------------------------------
 {- Ejercicio:
  Probar que un isormofismo en (C : Cat) es un isomorfismo en (C Op).
 
-
 -}
+
+iso-op : {∁ : Cat}{A B : Obj ∁}{f : Hom ∁ A B} → Iso {∁} A B f → Iso {∁ Op} B A f
+iso-op (iso inv law1 law2) = iso inv law2 law1 
 
 --------------------------------------------------
 {- Ejercicio EXTRA:
@@ -303,6 +421,17 @@ Ayuda : puede ser útil usar cong-app
      (A,a) → (B, b) es una función f : A → B, tal que f(a) = b 
 -}
 
+PSets : Cat
+PSets = record {
+           Obj = ∃ id
+         ; Hom = λ { (A , a) (B , b) → Σ (A → B) λ f → f a ≡ b }
+         ; iden = id , refl
+         ; _∙_ = λ { (f₂ , p₂) (f₁ , p₁) → f₂ ∘ f₁ , trans (cong f₂ p₁) p₂ }
+         ; idl = λ { {f = f , p} → cong (_,_ f) (ir _ p) }
+         ; idr = λ { {f = f , p} → cong (_,_ f) (ir _ p) }
+         ; ass = λ { {f = f , p} {g = g , q} {h = h , r} 
+                     → cong (_,_ (f ∘ g ∘ h)) (ir _ _) } }
+
 --------------------------------------------------
 
 {- Ejercicio EXTRA:
@@ -310,6 +439,37 @@ Ayuda : puede ser útil usar cong-app
   - objetos son conjuntos finitos (y por lo tanto isomorfos a Fin n para algún n)
   - morfismos son isomorfismos.  
 -}
+
+open import Data.Nat hiding (_⊔_)
+
+SetIso : (A B : Set) → Set
+SetIso A B = ∃ (Iso {Sets} A B)    
+
+data Fin : ℕ -> Set where
+  zero : {n : ℕ} → Fin (suc n)
+  suc  : {n : ℕ} → Fin n -> Fin (suc n)
+
+Finite : (A : Set) → Set
+Finite A = ∃ λ n → SetIso A (Fin n)
+
+open Iso
+
+{- No se como representar Obj -}
+
+FIN : Cat
+FIN = record {
+              Obj = ∃ Finite
+            ; Hom = λ { (A , _) (B , _) → SetIso A B }
+            ; iden = id , iso id refl refl
+            ; _∙_ = λ {(f , i) (g , j) 
+                     → f ∘ g , iso (inv j ∘ inv i) 
+                                   (ext λ y → trans 
+                                                (cong f (cong-app (law1 j) (inv i y)) )
+                                                (cong-app (law1 i) y)) 
+                                   (ext λ x → {!   !})}
+            ; idl = {!   !}
+            ; idr = {!   !}
+            ; ass = {!   !} }
 
 --------------------------------------------------
 
